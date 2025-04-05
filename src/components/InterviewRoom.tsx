@@ -2,12 +2,19 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import OpenAI from 'openai';
 
+interface Recording {
+  id: string;
+  url: string;
+  timestamp: Date;
+  filename: string;
+}
+
 const InterviewRoom: React.FC = () => {
   const { roomId } = useParams();
   const [messages, setMessages] = useState<Array<{ sender: string; text: string }>>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isRecording, setIsRecording] = useState(false);
-  const [transcription, setTranscription] = useState<string>('');
+  const [recordings, setRecordings] = useState<Recording[]>([]);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -30,12 +37,35 @@ const InterviewRoom: React.FC = () => {
       })
       .catch(err => console.error('Error accessing media devices:', err));
 
+    // Load existing recordings
+    fetchRecordings();
+
     return () => {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
         mediaRecorderRef.current.stop();
       }
+      // Cleanup recording URLs
+      recordings.forEach(recording => URL.revokeObjectURL(recording.url));
     };
   }, []);
+
+  const fetchRecordings = async () => {
+    try {
+      const response = await fetch('http://localhost:3001/recordings');
+      const files = await response.json();
+      
+      const recordingsList = files.map((filename: string) => ({
+        id: filename.replace('.webm', ''),
+        url: `http://localhost:3001/recordings/${filename}`,
+        timestamp: new Date(filename.split('-')[1]),
+        filename
+      }));
+      
+      setRecordings(recordingsList);
+    } catch (error) {
+      console.error('Error fetching recordings:', error);
+    }
+  };
 
   const startRecording = () => {
     navigator.mediaDevices.getUserMedia({ audio: true })
@@ -49,28 +79,47 @@ const InterviewRoom: React.FC = () => {
 
         mediaRecorderRef.current.onstop = async () => {
           const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-          const fileName = `recordings/interview-${timestamp}.webm`;
+          const timestamp = new Date();
+          const filename = `interview-${timestamp.toISOString().replace(/[:.]/g, '-')}.webm`;
           
-          // Save the audio file
-          const link = document.createElement('a');
-          link.href = URL.createObjectURL(audioBlob);
-          link.download = fileName;
-          link.click();
+          // Create FormData and append the audio blob
+          const formData = new FormData();
+          formData.append('audio', audioBlob, filename);
 
-          // Transcribe the audio
           try {
-            const transcription = await transcribeAudio(audioBlob);
-            setTranscription(transcription);
-            setMessages(prev => [...prev, { 
-              sender: 'Transcription', 
-              text: transcription 
-            }]);
+            // Upload to server
+            const response = await fetch('http://localhost:3001/upload', {
+              method: 'POST',
+              body: formData
+            });
+
+            if (!response.ok) {
+              throw new Error('Failed to upload recording');
+            }
+
+            const data = await response.json();
+            
+            // Stop recording
+            if (mediaRecorderRef.current) {
+              mediaRecorderRef.current.stop();
+            }
+            setIsRecording(false);
+            
+            // Create a new recording object
+            const recording: Recording = {
+              id: data.filename.replace('.webm', ''),
+              url: URL.createObjectURL(audioBlob),
+              timestamp: new Date(),
+              filename: data.filename
+            };
+
+            // Add to recordings list
+            setRecordings(prev => [...prev, recording]);
           } catch (error) {
-            console.error('Error transcribing audio:', error);
+            console.error('Error saving recording:', error);
             setMessages(prev => [...prev, { 
               sender: 'Error', 
-              text: 'Failed to transcribe audio' 
+              text: 'Failed to save recording' 
             }]);
           }
         };
@@ -88,29 +137,11 @@ const InterviewRoom: React.FC = () => {
     }
   };
 
-  const transcribeAudio = async (audioBlob: Blob): Promise<string> => {
-    if (!openaiRef.current) {
-      throw new Error('OpenAI client not initialized');
-    }
-
-    const formData = new FormData();
-    formData.append('file', audioBlob, 'audio.webm');
-    formData.append('model', 'whisper-1');
-
-    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`,
-      },
-      body: formData,
-    });
-
-    if (!response.ok) {
-      throw new Error('Transcription failed');
-    }
-
-    const data = await response.json();
-    return data.text;
+  const downloadRecording = (recording: Recording) => {
+    const link = document.createElement('a');
+    link.href = recording.url;
+    link.download = recording.filename || `interview-${recording.id}.webm`;
+    link.click();
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -178,6 +209,28 @@ const InterviewRoom: React.FC = () => {
                 Send
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* Recordings Panel */}
+        <div className="w-1/3 bg-white shadow p-4 overflow-y-auto">
+          <h2 className="text-lg font-semibold mb-4">Recordings</h2>
+          <div className="recordings-list">
+            {recordings.map(recording => (
+              <div key={recording.id} className="recording-item">
+                <div className="recording-info">
+                  <span className="recording-time">
+                    {recording.timestamp.toLocaleTimeString()}
+                  </span>
+                  <button 
+                    onClick={() => downloadRecording(recording)}
+                    className="download-btn"
+                  >
+                    Download
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
