@@ -3,7 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const cors = require('cors');
 const fs = require('fs');
-const { spawn } = require('child_process');
+const { spawn, exec } = require('child_process');
 require('dotenv').config();
 
 const app = express();
@@ -11,7 +11,7 @@ const port = 3001;
 
 // Enable CORS and JSON parsing
 app.use(cors());
-app.use(express.json());
+app.use(express.json());    
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -49,33 +49,6 @@ function transcribeRecording(filename) {
     });
 }
 
-// Function to run TTS script
-function tts() {
-    console.log("Starting TTS script...");
-    
-    return new Promise((resolve, reject) => {
-        const pythonProcess = spawn('python3', ['tts.py']);
-
-        pythonProcess.stdout.on('data', (data) => {
-            console.log(`TTS output: ${data}`);
-        });
-
-        pythonProcess.stderr.on('data', (data) => {
-            console.error(`TTS error: ${data}`);
-            reject(new Error(`TTS error: ${data}`));
-        });
-
-        pythonProcess.on('close', (code) => {
-            console.log(`TTS process exited with code ${code}`);
-            if (code === 0) {
-                resolve({ success: true, message: 'TTS script completed successfully' });
-            } else {
-                reject(new Error(`TTS process exited with code ${code}`));
-            }
-        });
-    });
-}
-
 // Watch for new files in recordings directory
 fs.watch(recordingsDir, (eventType, filename) => {
     if (eventType === 'rename' && filename && filename.endsWith('.webm')) {
@@ -84,28 +57,73 @@ fs.watch(recordingsDir, (eventType, filename) => {
     }
 });
 
-// Serve static files from recordings directory
-app.use('/recordings', express.static(recordingsDir));
+// API Routes
+// Test endpoint
+app.get('/api/test', (req, res) => {
+    console.log('Received request to /api/test endpoint');
+    res.json({ 
+        success: true,
+        message: "Server is running correctly!"
+    });
+});
 
-// Handle file uploads
-app.post('/upload', upload.single('audio'), (req, res) => {
+// Print string endpoint
+app.get('/api/print-string', (req, res) => {    
+    console.log('Received request to /api/print-string endpoint');
+    console.log('Request headers:', req.headers);
+    console.log('Request method:', req.method);
+    console.log('Request URL:', req.url);
+    
+    res.json({ 
+        success: true,
+        message: "Hello! This is a test string from the server!"
+    });
+});
+
+// Run TTS script endpoint
+app.get('/api/runtts', (req, res) => {
+    console.log('Received request to /api/runtts endpoint');
+    console.log('Current directory:', __dirname);
+    console.log('Starting TTS script...');
+    
+    exec('python3 tts.py', (error, stdout, stderr) => {
+        if (error) {
+            console.error(`Error running TTS script: ${error}`);
+            return res.status(500).json({ error: 'Error running TTS script' });
+        }
+        if (stderr) {
+            console.error(`TTS script stderr: ${stderr}`);
+            return res.status(500).json({ error: 'Error running TTS script' });
+        }
+        console.log(`TTS script output: ${stdout}`);
+        res.json({ success: true });
+    });
+});
+
+// File upload endpoint
+app.post('/api/upload', upload.single('audio'), (req, res) => {
+    console.log('Received request to /api/upload endpoint');
     if (!req.file) {
+        console.error('No file uploaded');
         return res.status(400).json({ error: 'No file uploaded' });
     }
 
     const filename = req.file.filename;
-    console.log(`File uploaded: ${filename}`);
+    console.log(`File uploaded successfully: ${filename}`);
 
     res.json({ 
+        success: true,
         message: 'File uploaded successfully',
         filename: filename
     });
 });
 
-// Get list of recordings
-app.get('/recordings', (req, res) => {
+// Get recordings list endpoint
+app.get('/api/recordings', (req, res) => {
+    console.log('Received request to /api/recordings endpoint');
     fs.readdir(recordingsDir, (err, files) => {
         if (err) {
+            console.error('Error reading recordings directory:', err);
             return res.status(500).json({ error: 'Error reading recordings directory' });
         }
         
@@ -117,24 +135,36 @@ app.get('/recordings', (req, res) => {
                 timestamp: file.split('-')[1].replace('.webm', '')
             }));
             
+        console.log(`Found ${recordings.length} recordings`);
         res.json(recordings);
     });
 });
 
-// Add TTS endpoint
-app.post('/run-tts', async (req, res) => {
-    try {
-        const result = await tts();
-        res.json(result);
-    } catch (error) {
-        console.error('Error running TTS:', error);
-        res.status(500).json({ 
-            error: 'Failed to run TTS script',
-            details: error.message
-        });
-    }
+// Error handling middleware
+app.use((err, req, res, next) => {
+    console.error('Error:', err);
+    res.status(500).json({ 
+        success: false,
+        error: 'Internal server error',
+        message: err.message 
+    });
 });
 
+// 404 handler
+app.use((req, res) => {
+    console.log(`404 - Not Found: ${req.method} ${req.url}`);
+    res.status(404).json({ 
+        success: false,
+        error: 'Not Found',
+        message: `Route ${req.method} ${req.url} not found` 
+    });
+});
+
+// Serve static files from recordings directory - moved to the end
+app.use('/recordings', express.static(recordingsDir));
+
+// Start server
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
+    console.log(`API endpoints available at http://localhost:${port}/api/`);
 });

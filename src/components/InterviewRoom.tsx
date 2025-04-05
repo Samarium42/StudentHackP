@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
 
 interface Recording {
     id: string;
@@ -9,15 +8,15 @@ interface Recording {
 }
 
 const InterviewRoom: React.FC = () => {
-    const { roomId } = useParams();
     const [isRecording, setIsRecording] = useState(false);
     const [recordings, setRecordings] = useState<Recording[]>([]);
     const [ttsStatus, setTtsStatus] = useState<string>('');
-    
+    const [printStatus, setPrintStatus] = useState<string>('');
     const videoRef = useRef<HTMLVideoElement>(null);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
 
+    // Separate useEffect for video initialization
     useEffect(() => {
         // Initialize video stream
         navigator.mediaDevices.getUserMedia({ video: true, audio: true })
@@ -28,6 +27,17 @@ const InterviewRoom: React.FC = () => {
             })
             .catch(err => console.error('Error accessing media devices:', err));
 
+        return () => {
+            // Cleanup video stream
+            if (videoRef.current && videoRef.current.srcObject) {
+                const stream = videoRef.current.srcObject as MediaStream;
+                stream.getTracks().forEach(track => track.stop());
+            }
+        };
+    }, []); // Empty dependency array - only run once on mount
+
+    // Separate useEffect for recordings
+    useEffect(() => {
         // Load existing recordings
         fetchRecordings();
 
@@ -38,7 +48,7 @@ const InterviewRoom: React.FC = () => {
             // Cleanup recording URLs
             recordings.forEach(recording => URL.revokeObjectURL(recording.url));
         };
-    }, []);
+    }, []); // Empty dependency array - only run once on mount
 
     const fetchRecordings = async () => {
         try {
@@ -118,28 +128,43 @@ const InterviewRoom: React.FC = () => {
         document.body.removeChild(link);
     };
 
-    const runTTS = async () => {
+    const printAString = async () => {
         try {
-            setTtsStatus('Running TTS script...');
-            const response = await fetch('http://localhost:3001/run-tts', {
-                method: 'POST',
-            });
+            console.log('Starting fetch request to /api/print-string');
+            const response = await fetch('http://localhost:3001/api/print-string');
+            console.log('Response status:', response.status);
+            console.log('Response headers:', Object.fromEntries(response.headers.entries()));
             
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             
             const data = await response.json();
-            console.log('TTS response:', data);
+            console.log('Received data:', data);
+            setPrintStatus(data.message);
+        } catch (error) {
+            console.error('Error printing string:', error);
+            setPrintStatus(`Error: ${error instanceof Error ? error.message : 'Failed to fetch string'}`);
+        }
+    };
+
+    const runTTS = async () => {
+        try {
+            console.log('Starting fetch request to /api/runtts');
+            const response = await fetch('http://localhost:3001/api/runtts');
+            console.log('Response status:', response.status);
+            console.log('Response headers:', Object.fromEntries(response.headers.entries()));
             
-            if (data.success) {
-                setTtsStatus('TTS script completed successfully');
-            } else {
-                setTtsStatus(`Error: ${data.error || 'Unknown error'}`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
-        } catch (error: any) {
+            
+            const data = await response.json();
+            console.log('Received data:', data);
+            setTtsStatus(data.success ? 'TTS script executed successfully' : 'Failed to execute TTS script');
+        } catch (error) {
             console.error('Error running TTS:', error);
-            setTtsStatus(`Error: ${error?.message || 'Failed to run TTS script'}`);
+            setTtsStatus(`Error: ${error instanceof Error ? error.message : 'Failed to run TTS script'}`);
         }
     };
 
@@ -171,19 +196,6 @@ const InterviewRoom: React.FC = () => {
                     <div className="bg-white rounded-lg shadow-lg p-4 h-full flex flex-col">
                         <h2 className="text-xl font-semibold mb-4">Controls</h2>
                         
-                        {/* TTS Button */}
-                        <div className="mb-4">
-                            <button
-                                onClick={runTTS}
-                                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-                            >
-                                Run TTS Script
-                            </button>
-                            {ttsStatus && (
-                                <p className="mt-2 text-sm text-gray-600">{ttsStatus}</p>
-                            )}
-                        </div>
-
                         {/* Recording Controls */}
                         <div className="mb-4">
                             <button
@@ -196,6 +208,29 @@ const InterviewRoom: React.FC = () => {
                             >
                                 {isRecording ? 'Stop Recording' : 'Start Recording'}
                             </button>
+                        </div>
+
+                        <div className="mb-4">
+                            <button
+                                onClick={runTTS}
+                                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                            >
+                                Run TTS Script
+                            </button>
+                            {ttsStatus && (
+                                <p className="mt-2 text-sm text-gray-600">{ttsStatus}</p>
+                            )}
+                        </div>
+                        <div className="mb-4">
+                          <button
+                            onClick={printAString}
+                            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                          >
+                            Print a String
+                          </button>
+                          {printStatus && (
+                              <p className="mt-2 text-sm text-gray-600">{printStatus}</p>
+                          )}
                         </div>
 
                         {/* Recordings List */}
