@@ -1,80 +1,153 @@
 import os
-import sys
-import whisper
-import torch
-import numpy as np
-from pydub import AudioSegment
+from pathlib import Path
 import time
+import requests
+import base64
+import subprocess
+import tempfile
 
-def split_audio(input_path, chunk_duration_ms=60000):
-    """Split audio file into chunks of specified duration."""
-    print(f"Splitting {input_path} into chunks...")
-    audio = AudioSegment.from_file(input_path, format="webm")
-    chunks = []
-    
-    # Split audio into chunks
-    for i in range(0, len(audio), chunk_duration_ms):
-        chunk = audio[i:i + chunk_duration_ms]
-        chunks.append(chunk)
-    
-    print(f"Processing {len(chunks)} chunks...")
-    return chunks
+# Your Google Cloud API key
+API_KEY = "AIzaSyCbv66adaLDsnUb8_1R_gKdAwqXPiQrWLA"
 
-def transcribe_chunk(chunk, model, chunk_number, total_chunks):
-    """Transcribe a single audio chunk."""
-    print(f"Transcribing chunk {chunk_number}/{total_chunks}...")
+def split_audio(audio_path, chunk_duration=15):
+    """
+    Split audio file into chunks of specified duration (in seconds) using ffmpeg
+    """
+    try:
+        # Create a temporary directory for chunks
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Use ffmpeg to split the audio file
+            output_pattern = os.path.join(temp_dir, "chunk_%03d.webm")
+            cmd = [
+                "ffmpeg", "-i", str(audio_path),
+                "-f", "segment",
+                "-segment_time", str(chunk_duration),
+                "-c", "copy",
+                output_pattern
+            ]
+            
+            # Run ffmpeg command
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                print(f"Error splitting audio: {result.stderr}")
+                return None
+            
+            # Read all chunks
+            chunks = []
+            chunk_files = sorted(Path(temp_dir).glob("chunk_*.webm"))
+            for chunk_file in chunk_files:
+                with open(chunk_file, "rb") as f:
+                    chunks.append(f.read())
+            
+            return chunks
+    except Exception as e:
+        print(f"Error splitting audio: {str(e)}")
+        return None
+
+def transcribe_chunk(audio_chunk):
+    """
+    Transcribe a single audio chunk using Google Cloud Speech-to-Text API
+    """
+    try:
+        # Convert chunk to base64
+        audio_content = base64.b64encode(audio_chunk).decode('utf-8')
+        
+        # Prepare the request
+        url = f"https://speech.googleapis.com/v1/speech:recognize?key={API_KEY}"
+        headers = {
+            "Content-Type": "application/json"
+        }
+        data = {
+            "config": {
+                "encoding": "WEBM_OPUS",
+                "sampleRateHertz": 48000,
+                "languageCode": "en-US",
+                "enableAutomaticPunctuation": True
+            },
+            "audio": {
+                "content": audio_content
+            }
+        }
+        
+        # Make the request
+        response = requests.post(url, headers=headers, json=data)
+        
+        if not response.ok:
+            print(f"Error response: {response.text}")
+            response.raise_for_status()
+            
+        result = response.json()
+        
+        # Extract the transcript
+        transcript = ""
+        if "results" in result:
+            for res in result["results"]:
+                transcript += res["alternatives"][0]["transcript"] + " "
+        
+        return transcript.strip()
+    except Exception as e:
+        print(f"Error transcribing chunk: {str(e)}")
+        return None
+
+def transcribe_audio(audio_path):
+    """
+    Transcribe an audio file by splitting it into chunks and combining the transcripts
+    """
+    try:
+        print(f"Splitting {audio_path} into chunks...")
+        chunks = split_audio(audio_path)
+        
+        if not chunks:
+            return None
+            
+        print(f"Processing {len(chunks)} chunks...")
+        transcripts = []
+        
+        for i, chunk in enumerate(chunks, 1):
+            print(f"Transcribing chunk {i}/{len(chunks)}...")
+            transcript = transcribe_chunk(chunk)
+            if transcript:
+                transcripts.append(transcript)
+            else:
+                print(f"Failed to transcribe chunk {i}")
+        
+        # Combine all transcripts
+        full_transcript = " ".join(transcripts)
+        return full_transcript.strip()
+    except Exception as e:
+        print(f"Error transcribing {audio_path}: {str(e)}")
+        return None
+
+def process_recordings():
+    """
+    Process all recordings in the recordings directory
+    """
+    recordings_dir = Path(__file__).parent / "recordings"
+    recordings_dir.mkdir(exist_ok=True)
     
-    # Convert chunk to numpy array
-    samples = np.array(chunk.get_array_of_samples())
-    if chunk.channels == 2:
-        samples = samples.reshape((-1, 2))
+    print(f"Looking for recordings in: {recordings_dir}")
     
-    # Normalize audio
-    samples = samples.astype(np.float32) / 32768.0
-    
-    # Transcribe
-    result = model.transcribe(samples)
-    return result["text"].strip()
+    for audio_file in recordings_dir.glob("*.webm"):
+        transcript_file = audio_file.with_suffix(".txt")
+        
+        if transcript_file.exists():
+            continue
+            
+        print(f"Processing {audio_file.name}...")
+        transcript = transcribe_audio(audio_file)
+        
+        if transcript:
+            with open(transcript_file, "w") as f:
+                f.write(transcript)
+            print(f"Saved transcript to {transcript_file.name}")
+        else:
+            print(f"Failed to transcribe {audio_file.name}")
 
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: python transcribe.py <filename>")
-        sys.exit(1)
-    
-    filename = sys.argv[1]
-    input_path = os.path.join('recordings', filename)
-    
-    if not os.path.exists(input_path):
-        print(f"File not found: {filename}")
-        sys.exit(1)
-    
-    print(f"Processing {filename}...")
-    
-    # Load Whisper model
-    print("Loading Whisper model...")
-    model = whisper.load_model("base")
-    
-    # Split audio into chunks
-    chunks = split_audio(input_path)
-    
-    # Transcribe each chunk
-    transcriptions = []
-    for i, chunk in enumerate(chunks, 1):
-        transcription = transcribe_chunk(chunk, model, i, len(chunks))
-        transcriptions.append(transcription)
-    
-    # Combine transcriptions
-    full_transcript = " ".join(transcriptions)
-    
-    # Save transcript
-    output_filename = os.path.splitext(filename)[0] + ".txt"
-    output_path = os.path.join('transcripts', output_filename)
-    
-    os.makedirs('transcripts', exist_ok=True)
-    with open(output_path, 'w', encoding='utf-8') as f:
-        f.write(full_transcript)
-    
-    print(f"Saved transcript to {output_filename}")
+    print("Starting transcription service...")
+    while True:
+        process_recordings()
+        time.sleep(5)
 
 if __name__ == "__main__":
     main() 

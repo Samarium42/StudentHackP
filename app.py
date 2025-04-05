@@ -82,4 +82,4 @@ def run_tts():
         return jsonify({'success': False, 'error': str(e)})
 
 if __name__ == '__main__':
-    app.run(debug=True, port=3002) 
+    app.run(debug=True, port=3003) 
