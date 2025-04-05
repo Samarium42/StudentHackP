@@ -5,6 +5,7 @@ import requests
 import base64
 import subprocess
 import tempfile
+import sys
 
 # Your Google Cloud API key
 API_KEY = "AIzaSyCbv66adaLDsnUb8_1R_gKdAwqXPiQrWLA"
@@ -118,6 +119,28 @@ def transcribe_audio(audio_path):
         print(f"Error transcribing {audio_path}: {str(e)}")
         return None
 
+def process_single_file(filename):
+    """
+    Process a single audio file and save its transcript
+    """
+    recordings_dir = Path(__file__).parent / "recordings"
+    audio_file = recordings_dir / filename
+    
+    if not audio_file.exists():
+        print(f"File not found: {filename}")
+        return
+    
+    print(f"Processing {filename}...")
+    transcript = transcribe_audio(audio_file)
+    
+    if transcript:
+        transcript_file = audio_file.with_suffix(".txt")
+        with open(transcript_file, "w") as f:
+            f.write(transcript)
+        print(f"Saved transcript to {transcript_file.name}")
+    else:
+        print(f"Failed to transcribe {filename}")
+
 def process_recordings():
     """
     Process all recordings in the recordings directory
@@ -133,21 +156,15 @@ def process_recordings():
         if transcript_file.exists():
             continue
             
-        print(f"Processing {audio_file.name}...")
-        transcript = transcribe_audio(audio_file)
-        
-        if transcript:
-            with open(transcript_file, "w") as f:
-                f.write(transcript)
-            print(f"Saved transcript to {transcript_file.name}")
-        else:
-            print(f"Failed to transcribe {audio_file.name}")
+        process_single_file(audio_file.name)
 
 def main():
-    print("Starting transcription service...")
-    while True:
+    if len(sys.argv) > 1:
+        # Process specific file if provided as argument
+        process_single_file(sys.argv[1])
+    else:
+        # Process all recordings
         process_recordings()
-        time.sleep(60)
 
 if __name__ == "__main__":
     main() 

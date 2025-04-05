@@ -3,94 +3,138 @@ const multer = require('multer');
 const path = require('path');
 const cors = require('cors');
 const fs = require('fs');
+const { spawn } = require('child_process');
+require('dotenv').config();
 
 const app = express();
 const port = 3001;
 
-// Enable CORS
+// Enable CORS and JSON parsing
 app.use(cors());
-
-// Parse JSON bodies
 app.use(express.json());
 
-// Ensure recordings directory exists
-const recordingsDir = path.join(__dirname, 'recordings');
-if (!fs.existsSync(recordingsDir)) {
-  fs.mkdirSync(recordingsDir);
-}
-
-// Configure multer for file upload
+// Configure multer for file uploads
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, recordingsDir);
-  },
-  filename: function (req, file, cb) {
-    cb(null, file.originalname);
-  }
+    destination: function (req, file, cb) {
+        cb(null, 'recordings/');
+    },
+    filename: function (req, file, cb) {
+        cb(null, file.originalname);
+    }
 });
 
 const upload = multer({ storage: storage });
 
+// Ensure recordings directory exists
+const recordingsDir = path.join(__dirname, 'recordings');
+if (!fs.existsSync(recordingsDir)) {
+    fs.mkdirSync(recordingsDir);
+}
+
+// Function to transcribe a recording
+function transcribeRecording(filename) {
+    console.log(`Starting transcription for: ${filename}`);
+    const pythonProcess = spawn('python3', ['transcribe.py', filename]);
+    
+    pythonProcess.stdout.on('data', (data) => {
+        console.log(`Transcription output: ${data}`);
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+        console.error(`Transcription error: ${data}`);
+    });
+
+    pythonProcess.on('close', (code) => {
+        console.log(`Transcription process exited with code ${code}`);
+    });
+}
+
+// Function to run TTS script
+function tts() {
+    console.log("Starting TTS script...");
+    
+    return new Promise((resolve, reject) => {
+        const pythonProcess = spawn('python3', ['tts.py']);
+
+        pythonProcess.stdout.on('data', (data) => {
+            console.log(`TTS output: ${data}`);
+        });
+
+        pythonProcess.stderr.on('data', (data) => {
+            console.error(`TTS error: ${data}`);
+            reject(new Error(`TTS error: ${data}`));
+        });
+
+        pythonProcess.on('close', (code) => {
+            console.log(`TTS process exited with code ${code}`);
+            if (code === 0) {
+                resolve({ success: true, message: 'TTS script completed successfully' });
+            } else {
+                reject(new Error(`TTS process exited with code ${code}`));
+            }
+        });
+    });
+}
+
+// Watch for new files in recordings directory
+fs.watch(recordingsDir, (eventType, filename) => {
+    if (eventType === 'rename' && filename && filename.endsWith('.webm')) {
+        console.log(`New recording detected: ${filename}`);
+        transcribeRecording(filename);
+    }
+});
+
 // Serve static files from recordings directory
 app.use('/recordings', express.static(recordingsDir));
 
-// Handle file upload
+// Handle file uploads
 app.post('/upload', upload.single('audio'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No file uploaded' });
-  }
-  res.json({ 
-    message: 'File uploaded successfully',
-    filename: req.file.filename
-  });
-});
-
-// Save transcript
-app.post('/transcript', (req, res) => {
-  const { filename, transcript } = req.body;
-  if (!filename || !transcript) {
-    console.error('Missing filename or transcript:', { filename, transcript });
-    return res.status(400).json({ error: 'Missing filename or transcript' });
-  }
-
-  const transcriptPath = path.join(recordingsDir, `${filename}.txt`);
-  try {
-    fs.writeFileSync(transcriptPath, transcript);
-    console.log('Transcript saved successfully:', transcriptPath);
-    res.json({ message: 'Transcript saved successfully' });
-  } catch (error) {
-    console.error('Error saving transcript:', error);
-    res.status(500).json({ error: 'Failed to save transcript' });
-  }
-});
-
-// Get list of recordings with transcripts
-app.get('/recordings', (req, res) => {
-  fs.readdir(recordingsDir, (err, files) => {
-    if (err) {
-      return res.status(500).json({ error: 'Error reading recordings directory' });
+    if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
     }
-    
-    // Filter out transcript files and create response with both recordings and transcripts
-    const recordings = files.filter(file => file.endsWith('.webm'));
-    const response = recordings.map(recording => {
-      const transcriptFile = `${recording}.txt`;
-      let transcript = null;
-      
-      if (files.includes(transcriptFile)) {
-        transcript = fs.readFileSync(path.join(recordingsDir, transcriptFile), 'utf8');
-      }
-      
-      return {
-        filename: recording,
-        transcript
-      };
+
+    const filename = req.file.filename;
+    console.log(`File uploaded: ${filename}`);
+
+    res.json({ 
+        message: 'File uploaded successfully',
+        filename: filename
     });
-    
-    res.json(response);
-  });
+});
+
+// Get list of recordings
+app.get('/recordings', (req, res) => {
+    fs.readdir(recordingsDir, (err, files) => {
+        if (err) {
+            return res.status(500).json({ error: 'Error reading recordings directory' });
+        }
+        
+        const recordings = files
+            .filter(file => file.endsWith('.webm'))
+            .map(file => ({
+                filename: file,
+                url: `/recordings/${file}`,
+                timestamp: file.split('-')[1].replace('.webm', '')
+            }));
+            
+        res.json(recordings);
+    });
+});
+
+// Add TTS endpoint
+app.post('/run-tts', async (req, res) => {
+    try {
+        const result = await tts();
+        res.json(result);
+    } catch (error) {
+        console.error('Error running TTS:', error);
+        res.status(500).json({ 
+            error: 'Failed to run TTS script',
+            details: error.message
+        });
+    }
 });
 
 app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
-}); 
+    console.log(`Server running on port ${port}`);
+});

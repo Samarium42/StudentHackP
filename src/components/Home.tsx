@@ -7,6 +7,13 @@ const Home: React.FC = () => {
   const handleStartInterview = () => {
     const roomId = Math.random().toString(36).substring(7);
     navigate(`/interview/${roomId}`);
+
+    fetch('/start-interview', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Response from server:', data.message);
+        })
+        .catch(error => console.error('Failed to start interview:', error));
   };
 
   return (
