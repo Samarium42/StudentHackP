@@ -1,188 +1,219 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
-import OpenAI from 'openai';
+import React, { useEffect, useRef, useState } from 'react';
+
+interface Recording {
+    id: string;
+    url: string;
+    timestamp: Date;
+    filename: string;
+}
 
 const InterviewRoom: React.FC = () => {
-  const { roomId } = useParams();
-  const [messages, setMessages] = useState<Array<{ sender: string; text: string }>>([]);
-  const [newMessage, setNewMessage] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
-  const [transcription, setTranscription] = useState<string>('');
-  
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const openaiRef = useRef<OpenAI | null>(null);
+    const [isRecording, setIsRecording] = useState(false);
+    const [recordings, setRecordings] = useState<Recording[]>([]);
+    const [ttsStatus, setTtsStatus] = useState<string>('');
+    const [status, setStatus] = useState<string>('');
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const chunksRef = useRef<Blob[]>([]);
 
-  useEffect(() => {
-    // Initialize OpenAI client
-    openaiRef.current = new OpenAI({ 
-      apiKey: process.env.REACT_APP_OPENAI_API_KEY,
-      dangerouslyAllowBrowser: true 
-    });
+    useEffect(() => {
+        fetchRecordings();
+        return () => {
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+                mediaRecorderRef.current.stop();
+            }
+            recordings.forEach(recording => URL.revokeObjectURL(recording.url));
+        };
+    }, []);
 
-    // Initialize video stream
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-      .then(stream => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
+    const fetchRecordings = async () => {
+        try {
+            const response = await fetch('http://localhost:3001/api/recordings');
+            if (!response.ok) {
+                throw new Error('Failed to fetch recordings');
+            }
+            const data = await response.json();
+            setRecordings(data);
+        } catch (error) {
+            console.error('Error fetching recordings:', error);
+            setStatus('Error fetching recordings');
         }
-      })
-      .catch(err => console.error('Error accessing media devices:', err));
-
-    return () => {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-        mediaRecorderRef.current.stop();
-      }
     };
-  }, []);
 
-  const startRecording = () => {
-    navigator.mediaDevices.getUserMedia({ audio: true })
-      .then(stream => {
-        mediaRecorderRef.current = new MediaRecorder(stream);
-        audioChunksRef.current = [];
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    sampleRate: 44100
+                }
+            });
 
-        mediaRecorderRef.current.ondataavailable = (event) => {
-          audioChunksRef.current.push(event.data);
-        };
+            mediaRecorderRef.current = new MediaRecorder(stream, {
+                mimeType: 'audio/webm;codecs=opus'
+            });
+            chunksRef.current = [];
 
-        mediaRecorderRef.current.onstop = async () => {
-          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-          const fileName = `recordings/interview-${timestamp}.webm`;
-          
-          // Save the audio file
-          const link = document.createElement('a');
-          link.href = URL.createObjectURL(audioBlob);
-          link.download = fileName;
-          link.click();
+            mediaRecorderRef.current.ondataavailable = (event) => {
+                chunksRef.current.push(event.data);
+            };
 
-          // Transcribe the audio
-          try {
-            const transcription = await transcribeAudio(audioBlob);
-            setTranscription(transcription);
-            setMessages(prev => [...prev, { 
-              sender: 'Transcription', 
-              text: transcription 
-            }]);
-          } catch (error) {
-            console.error('Error transcribing audio:', error);
-            setMessages(prev => [...prev, { 
-              sender: 'Error', 
-              text: 'Failed to transcribe audio' 
-            }]);
-          }
-        };
+            mediaRecorderRef.current.onstop = async () => {
+                const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
+                const timestamp = new Date();
+                const filename = `interview-${timestamp.toISOString().replace(/[:.]/g, '-')}.webm`;
+                
+                const formData = new FormData();
+                formData.append('audio', audioBlob, filename);
 
-        mediaRecorderRef.current.start();
-        setIsRecording(true);
-      })
-      .catch(err => console.error('Error starting recording:', err));
-  };
+                try {
+                    const response = await fetch('http://localhost:3001/api/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-    }
-  };
+                    if (!response.ok) {
+                        throw new Error('Failed to upload recording');
+                    }
 
-  const transcribeAudio = async (audioBlob: Blob): Promise<string> => {
-    if (!openaiRef.current) {
-      throw new Error('OpenAI client not initialized');
-    }
+                    const data = await response.json();
+                    setStatus('Recording uploaded successfully');
+                    fetchRecordings();
+                } catch (error) {
+                    console.error('Error uploading recording:', error);
+                    setStatus('Error uploading recording');
+                }
+            };
 
-    const formData = new FormData();
-    formData.append('file', audioBlob, 'audio.webm');
-    formData.append('model', 'whisper-1');
+            mediaRecorderRef.current.start();
+            setIsRecording(true);
+            setStatus('Recording started');
+        } catch (error) {
+            console.error('Error starting recording:', error);
+            setStatus('Error starting recording');
+        }
+    };
 
-    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`,
-      },
-      body: formData,
-    });
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+            setStatus('Recording stopped');
+        }
+    };
 
-    if (!response.ok) {
-      throw new Error('Transcription failed');
-    }
+    const runTTS = async () => {
+        try {
+            setTtsStatus('Running TTS...');
+            const response = await fetch('http://localhost:3001/runtts');
+            const data = await response.json();
+            
+            if (data.success) {
+                setTtsStatus('TTS completed successfully');
+            } else {
+                setTtsStatus(`TTS failed: ${data.error}`);
+            }
+        } catch (error) {
+            console.error('Error running TTS:', error);
+            setTtsStatus('Error running TTS');
+        }
+    };
 
-    const data = await response.json();
-    return data.text;
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      if (isRecording) {
-        stopRecording();
-      } else {
-        startRecording();
-      }
-    }
-  };
-
-  const handleSendMessage = () => {
-    if (newMessage.trim()) {
-      setMessages([...messages, { sender: 'You', text: newMessage }]);
-      setNewMessage('');
-    }
-  };
-
-  return (
-    <div className="h-screen flex flex-col">
-      <div className="bg-gray-800 text-white p-4">
-        <h1 className="text-xl font-bold">Interview Room: {roomId}</h1>
-        <div className="flex items-center mt-2">
-          <div className="mr-4 flex items-center">
-            <div className={`w-3 h-3 rounded-full mr-2 ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-gray-400'}`}></div>
-            <span className="text-sm">{isRecording ? 'Recording' : 'Press Enter to Start Recording'}</span>
-          </div>
-        </div>
-      </div>
-      
-      <div className="flex-1 flex">
-        <div className="w-full flex flex-col p-4">
-          <div className="bg-gray-100 rounded-lg p-4 mb-4">
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              className="w-full rounded-lg"
-            />
-          </div>
-          
-          <div className="flex-1 bg-white rounded-lg shadow p-4 flex flex-col">
-            <div className="flex-1 overflow-y-auto mb-4">
-              {messages.map((message, index) => (
-                <div key={index} className="mb-2">
-                  <span className="font-bold">{message.sender}: </span>
-                  <span>{message.text}</span>
-                </div>
-              ))}
+    return (
+        <div className="interview-room">
+            <div className="controls">
+                <button 
+                    onClick={isRecording ? stopRecording : startRecording}
+                    className={isRecording ? 'recording' : ''}
+                >
+                    {isRecording ? 'Stop Recording' : 'Start Recording'}
+                </button>
+                <button onClick={runTTS}>Run TTS</button>
             </div>
-            <div className="flex">
-              <input
-                type="text"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
-                className="flex-1 border rounded-l-lg p-2"
-                placeholder="Type a message or press Enter to start/stop recording..."
-              />
-              <button
-                onClick={handleSendMessage}
-                className="bg-blue-500 text-white px-4 py-2 rounded-r-lg"
-              >
-                Send
-              </button>
+
+            {status && <div className="status">{status}</div>}
+            {ttsStatus && <div className="tts-status">{ttsStatus}</div>}
+
+            <div className="recordings-list">
+                <h3>Recordings</h3>
+                {recordings.map((recording) => (
+                    <div key={recording.id} className="recording-item">
+                        <audio controls src={recording.url} />
+                        <span className="timestamp">
+                            {new Date(recording.timestamp).toLocaleString()}
+                        </span>
+                    </div>
+                ))}
             </div>
-          </div>
+
+            <style>{`
+                .interview-room {
+                    max-width: 800px;
+                    margin: 0 auto;
+                    padding: 20px;
+                }
+
+                .controls {
+                    display: flex;
+                    gap: 10px;
+                    margin-bottom: 20px;
+                }
+
+                button {
+                    padding: 10px 20px;
+                    font-size: 16px;
+                    border: none;
+                    border-radius: 5px;
+                    cursor: pointer;
+                    background-color: #007bff;
+                    color: white;
+                    transition: background-color 0.3s;
+                }
+
+                button:hover {
+                    background-color: #0056b3;
+                }
+
+                button.recording {
+                    background-color: #dc3545;
+                }
+
+                button.recording:hover {
+                    background-color: #c82333;
+                }
+
+                .status, .tts-status {
+                    margin: 10px 0;
+                    padding: 10px;
+                    border-radius: 5px;
+                    background-color: #f8f9fa;
+                }
+
+                .recordings-list {
+                    margin-top: 20px;
+                }
+
+                .recording-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    margin: 10px 0;
+                    padding: 10px;
+                    background-color: #f8f9fa;
+                    border-radius: 5px;
+                }
+
+                .timestamp {
+                    color: #6c757d;
+                    font-size: 14px;
+                }
+
+                audio {
+                    flex: 1;
+                }
+            `}</style>
         </div>
-      </div>
-    </div>
-  );
+    );
 };
 
 export default InterviewRoom; 

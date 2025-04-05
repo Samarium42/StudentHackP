@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Interview</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .interview-room {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        button.recording {
+            background-color: #dc3545;
+        }
+
+        button.recording:hover {
+            background-color: #c82333;
+        }
+
+        .status, .tts-status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #f8f9fa;
+        }
+
+        .recordings-list {
+            margin-top: 20px;
+        }
+
+        .recording-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+
+        .timestamp {
+            color: #6c757d;
+            font-size: 14px;
+        }
+
+        audio {
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="interview-room">
+        <div class="controls">
+            <button id="recordButton">Start Recording</button>
+            <button id="ttsButton">Run TTS</button>
+        </div>
+
+        <div id="status" class="status"></div>
+        <div id="ttsStatus" class="tts-status"></div>
+
+        <div class="recordings-list">
+            <h3>Recordings</h3>
+            <div id="recordingsList"></div>
+        </div>
+    </div>
+
+    <script>
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
+
+        // Fetch and display recordings
+        async function fetchRecordings() {
+            try {
+                const response = await fetch('/api/recordings');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch recordings');
+                }
+                const recordings = await response.json();
+                displayRecordings(recordings);
+            } catch (error) {
+                console.error('Error fetching recordings:', error);
+                updateStatus('Error fetching recordings');
+            }
+        }
+
+        // Display recordings in the list
+        function displayRecordings(recordings) {
+            const recordingsList = document.getElementById('recordingsList');
+            recordingsList.innerHTML = recordings.map(recording => `
+                <div class="recording-item">
+                    <audio controls src="${recording.url}"></audio>
+                    <span class="timestamp">
+                        ${new Date(recording.timestamp).toLocaleString()}
+                    </span>
+                </div>
+            `).join('');
+        }
+
+        // Update status message
+        function updateStatus(message) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+        }
+
+        // Update TTS status message
+        function updateTTSStatus(message) {
+            const status = document.getElementById('ttsStatus');
+            status.textContent = message;
+        }
+
+        // Start recording
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        sampleRate: 44100
+                    }
+                });
+
+                mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: 'audio/webm;codecs=opus'
+                });
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const timestamp = new Date();
+                    const filename = `interview-${timestamp.toISOString().replace(/[:.]/g, '-')}.webm`;
+                    
+                    const formData = new FormData();
+                    formData.append('audio', audioBlob, filename);
+
+                    try {
+                        const response = await fetch('/api/upload', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Failed to upload recording');
+                        }
+
+                        updateStatus('Recording uploaded successfully');
+                        fetchRecordings();
+                    } catch (error) {
+                        console.error('Error uploading recording:', error);
+                        updateStatus('Error uploading recording');
+                    }
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                updateStatus('Recording started');
+                document.getElementById('recordButton').textContent = 'Stop Recording';
+                document.getElementById('recordButton').classList.add('recording');
+            } catch (error) {
+                console.error('Error starting recording:', error);
+                updateStatus('Error starting recording');
+            }
+        }
+
+        // Stop recording
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                isRecording = false;
+                updateStatus('Recording stopped');
+                document.getElementById('recordButton').textContent = 'Start Recording';
+                document.getElementById('recordButton').classList.remove('recording');
+            }
+        }
+
+        // Run TTS
+        async function runTTS() {
+            try {
+                updateTTSStatus('Running TTS...');
+                const response = await fetch('/runtts');
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateTTSStatus('TTS completed successfully');
+                } else {
+                    updateTTSStatus(`TTS failed: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Error running TTS:', error);
+                updateTTSStatus('Error running TTS');
+            }
+        }
+
+        // Event listeners
+        document.getElementById('recordButton').addEventListener('click', () => {
+            if (isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        });
+
+        document.getElementById('ttsButton').addEventListener('click', runTTS);
+
+        // Initial load
+        fetchRecordings();
+    </script>
+</body>
+</html> 
