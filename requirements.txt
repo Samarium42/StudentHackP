@@ -1,1 +1,6 @@
-requests==2.31.0 
+requests==2.31.0
+numpy==1.21.2
+librosa==0.8.1
+textblob==0.17.1
+scipy==1.7.3
+soundfile==0.12.1 
