@@ -11,48 +11,23 @@ const InterviewRoom: React.FC = () => {
     const [isRecording, setIsRecording] = useState(false);
     const [recordings, setRecordings] = useState<Recording[]>([]);
     const [ttsStatus, setTtsStatus] = useState<string>('');
-    const [printStatus, setPrintStatus] = useState<string>('');
-    const videoRef = useRef<HTMLVideoElement>(null);
+    const [status, setStatus] = useState<string>('');
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-    const audioChunksRef = useRef<Blob[]>([]);
+    const chunksRef = useRef<Blob[]>([]);
 
-    // Separate useEffect for video initialization
     useEffect(() => {
-        // Initialize video stream
-        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-            .then(stream => {
-                if (videoRef.current) {
-                    videoRef.current.srcObject = stream;
-                }
-            })
-            .catch(err => console.error('Error accessing media devices:', err));
-
-        return () => {
-            // Cleanup video stream
-            if (videoRef.current && videoRef.current.srcObject) {
-                const stream = videoRef.current.srcObject as MediaStream;
-                stream.getTracks().forEach(track => track.stop());
-            }
-        };
-    }, []); // Empty dependency array - only run once on mount
-
-    // Separate useEffect for recordings
-    useEffect(() => {
-        // Load existing recordings
         fetchRecordings();
-
         return () => {
             if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
                 mediaRecorderRef.current.stop();
             }
-            // Cleanup recording URLs
             recordings.forEach(recording => URL.revokeObjectURL(recording.url));
         };
-    }, []); // Empty dependency array - only run once on mount
+    }, []);
 
     const fetchRecordings = async () => {
         try {
-            const response = await fetch('http://localhost:3001/recordings');
+            const response = await fetch('http://localhost:3001/api/recordings');
             if (!response.ok) {
                 throw new Error('Failed to fetch recordings');
             }
@@ -60,199 +35,183 @@ const InterviewRoom: React.FC = () => {
             setRecordings(data);
         } catch (error) {
             console.error('Error fetching recordings:', error);
+            setStatus('Error fetching recordings');
         }
     };
 
-    const startRecording = () => {
-        navigator.mediaDevices.getUserMedia({ audio: true })
-            .then(stream => {
-                mediaRecorderRef.current = new MediaRecorder(stream);
-                audioChunksRef.current = [];
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    sampleRate: 44100
+                }
+            });
 
-                mediaRecorderRef.current.ondataavailable = (event) => {
-                    audioChunksRef.current.push(event.data);
-                };
+            mediaRecorderRef.current = new MediaRecorder(stream, {
+                mimeType: 'audio/webm;codecs=opus'
+            });
+            chunksRef.current = [];
 
-                mediaRecorderRef.current.onstop = async () => {
-                    const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-                    const timestamp = new Date();
-                    const filename = `interview-${timestamp.toISOString().replace(/[:.]/g, '-')}.webm`;
-                    
-                    const formData = new FormData();
-                    formData.append('audio', audioBlob, filename);
+            mediaRecorderRef.current.ondataavailable = (event) => {
+                chunksRef.current.push(event.data);
+            };
 
-                    try {
-                        const response = await fetch('http://localhost:3001/upload', {
-                            method: 'POST',
-                            body: formData
-                        });
+            mediaRecorderRef.current.onstop = async () => {
+                const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
+                const timestamp = new Date();
+                const filename = `interview-${timestamp.toISOString().replace(/[:.]/g, '-')}.webm`;
+                
+                const formData = new FormData();
+                formData.append('audio', audioBlob, filename);
 
-                        if (!response.ok) {
-                            throw new Error('Failed to upload recording');
-                        }
+                try {
+                    const response = await fetch('http://localhost:3001/api/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
 
-                        const data = await response.json();
-                        
-                        const recording: Recording = {
-                            id: data.filename.replace('.webm', ''),
-                            url: URL.createObjectURL(audioBlob),
-                            timestamp: new Date(),
-                            filename: data.filename
-                        };
-
-                        setRecordings(prev => [...prev, recording]);
-                    } catch (error) {
-                        console.error('Error saving recording:', error);
+                    if (!response.ok) {
+                        throw new Error('Failed to upload recording');
                     }
-                };
 
-                mediaRecorderRef.current.start();
-                setIsRecording(true);
-            })
-            .catch(err => console.error('Error starting recording:', err));
+                    const data = await response.json();
+                    setStatus('Recording uploaded successfully');
+                    fetchRecordings();
+                } catch (error) {
+                    console.error('Error uploading recording:', error);
+                    setStatus('Error uploading recording');
+                }
+            };
+
+            mediaRecorderRef.current.start();
+            setIsRecording(true);
+            setStatus('Recording started');
+        } catch (error) {
+            console.error('Error starting recording:', error);
+            setStatus('Error starting recording');
+        }
     };
 
     const stopRecording = () => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
             mediaRecorderRef.current.stop();
             setIsRecording(false);
-        }
-    };
-
-    const downloadRecording = (recording: Recording) => {
-        const link = document.createElement('a');
-        link.href = recording.url;
-        link.download = recording.filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    };
-
-    const printAString = async () => {
-        try {
-            console.log('Starting fetch request to /api/print-string');
-            const response = await fetch('http://localhost:3001/api/print-string');
-            console.log('Response status:', response.status);
-            console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-            
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            console.log('Received data:', data);
-            setPrintStatus(data.message);
-        } catch (error) {
-            console.error('Error printing string:', error);
-            setPrintStatus(`Error: ${error instanceof Error ? error.message : 'Failed to fetch string'}`);
+            setStatus('Recording stopped');
         }
     };
 
     const runTTS = async () => {
         try {
-            console.log('Starting fetch request to /api/runtts');
-            const response = await fetch('http://localhost:3001/api/runtts');
-            console.log('Response status:', response.status);
-            console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-            
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
+            setTtsStatus('Running TTS...');
+            const response = await fetch('http://localhost:3001/runtts');
             const data = await response.json();
-            console.log('Received data:', data);
-            setTtsStatus(data.success ? 'TTS script executed successfully' : 'Failed to execute TTS script');
+            
+            if (data.success) {
+                setTtsStatus('TTS completed successfully');
+            } else {
+                setTtsStatus(`TTS failed: ${data.error}`);
+            }
         } catch (error) {
             console.error('Error running TTS:', error);
-            setTtsStatus(`Error: ${error instanceof Error ? error.message : 'Failed to run TTS script'}`);
+            setTtsStatus('Error running TTS');
         }
     };
 
     return (
-        <div className="flex flex-col h-screen bg-gray-100">
-            <header className="bg-white shadow">
-                <div className="max-w-7xl mx-auto py-6 px-4">
-                    <h1 className="text-3xl font-bold text-gray-900">Interview Room</h1>
-                </div>
-            </header>
-            
-            <div className="flex-1 flex">
-                {/* Left side - Video */}
-                <div className="w-1/2 p-4">
-                    <div className="bg-white rounded-lg shadow-lg p-4 h-full">
-                        <h2 className="text-xl font-semibold mb-4">Video Feed</h2>
-                        <video
-                            ref={videoRef}
-                            autoPlay
-                            playsInline
-                            muted
-                            className="w-full h-[calc(100%-3rem)] object-cover rounded-lg"
-                        />
-                    </div>
-                </div>
-
-                {/* Right side - Controls and Recordings */}
-                <div className="w-1/2 p-4">
-                    <div className="bg-white rounded-lg shadow-lg p-4 h-full flex flex-col">
-                        <h2 className="text-xl font-semibold mb-4">Controls</h2>
-                        
-                        {/* Recording Controls */}
-                        <div className="mb-4">
-                            <button
-                                onClick={isRecording ? stopRecording : startRecording}
-                                className={`px-4 py-2 rounded transition-colors ${
-                                    isRecording
-                                        ? 'bg-red-500 hover:bg-red-600 text-white'
-                                        : 'bg-green-500 hover:bg-green-600 text-white'
-                                }`}
-                            >
-                                {isRecording ? 'Stop Recording' : 'Start Recording'}
-                            </button>
-                        </div>
-
-                        <div className="mb-4">
-                            <button
-                                onClick={runTTS}
-                                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-                            >
-                                Run TTS Script
-                            </button>
-                            {ttsStatus && (
-                                <p className="mt-2 text-sm text-gray-600">{ttsStatus}</p>
-                            )}
-                        </div>
-                        <div className="mb-4">
-                          <button
-                            onClick={printAString}
-                            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-                          >
-                            Print a String
-                          </button>
-                          {printStatus && (
-                              <p className="mt-2 text-sm text-gray-600">{printStatus}</p>
-                          )}
-                        </div>
-
-                        {/* Recordings List */}
-                        <div className="flex-1 overflow-y-auto">
-                            <h3 className="text-lg font-semibold mb-2">Recordings</h3>
-                            <div className="space-y-2">
-                                {recordings.map((recording, index) => (
-                                    <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                                        <span>Recording {index + 1}</span>
-                                        <button
-                                            onClick={() => downloadRecording(recording)}
-                                            className="text-blue-500 hover:text-blue-600"
-                                        >
-                                            Download
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </div>
+        <div className="interview-room">
+            <div className="controls">
+                <button 
+                    onClick={isRecording ? stopRecording : startRecording}
+                    className={isRecording ? 'recording' : ''}
+                >
+                    {isRecording ? 'Stop Recording' : 'Start Recording'}
+                </button>
+                <button onClick={runTTS}>Run TTS</button>
             </div>
+
+            {status && <div className="status">{status}</div>}
+            {ttsStatus && <div className="tts-status">{ttsStatus}</div>}
+
+            <div className="recordings-list">
+                <h3>Recordings</h3>
+                {recordings.map((recording) => (
+                    <div key={recording.id} className="recording-item">
+                        <audio controls src={recording.url} />
+                        <span className="timestamp">
+                            {new Date(recording.timestamp).toLocaleString()}
+                        </span>
+                    </div>
+                ))}
+            </div>
+
+            <style>{`
+                .interview-room {
+                    max-width: 800px;
+                    margin: 0 auto;
+                    padding: 20px;
+                }
+
+                .controls {
+                    display: flex;
+                    gap: 10px;
+                    margin-bottom: 20px;
+                }
+
+                button {
+                    padding: 10px 20px;
+                    font-size: 16px;
+                    border: none;
+                    border-radius: 5px;
+                    cursor: pointer;
+                    background-color: #007bff;
+                    color: white;
+                    transition: background-color 0.3s;
+                }
+
+                button:hover {
+                    background-color: #0056b3;
+                }
+
+                button.recording {
+                    background-color: #dc3545;
+                }
+
+                button.recording:hover {
+                    background-color: #c82333;
+                }
+
+                .status, .tts-status {
+                    margin: 10px 0;
+                    padding: 10px;
+                    border-radius: 5px;
+                    background-color: #f8f9fa;
+                }
+
+                .recordings-list {
+                    margin-top: 20px;
+                }
+
+                .recording-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    margin: 10px 0;
+                    padding: 10px;
+                    background-color: #f8f9fa;
+                    border-radius: 5px;
+                }
+
+                .timestamp {
+                    color: #6c757d;
+                    font-size: 14px;
+                }
+
+                audio {
+                    flex: 1;
+                }
+            `}</style>
         </div>
     );
 };
