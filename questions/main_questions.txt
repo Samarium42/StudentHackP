@@ -1,0 +1,5 @@
+Your resume highlights significant experience with data analysis and modeling, especially in forecasting. Can you describe a time when your model’s predictions led to a crucial decision, and what was the impact?
+You mention developing algorithmic trading strategies and achieving consistent backtested returns. Can you elaborate on the challenges you faced in translating these backtested strategies into a live trading environment, and how you would address them?
+Red Bull values innovation and pushing boundaries. Can you discuss a time you took a creative or unconventional approach to solving a problem, either in your academic work or in a hackathon, and what the outcome was?
+Describe the most challenging technical problem you encountered during your Data Science Internship at Polestar Solutions. What steps did you take to overcome it, and what did you learn from the experience?
+You highlight your role as Secretary General of the Math Society, with a focus on promoting diversity and inclusion. Tell me about a specific initiative you implemented to increase participation from underrepresented groups, and how you measured its success?

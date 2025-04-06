@@ -1,7 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
-const cors = require('cors');
+//const cors = require('cors');
 const fs = require('fs');
 const { spawn, exec } = require('child_process');
 require('dotenv').config();
@@ -10,7 +10,7 @@ const app = express();
 const port = 3001;
 
 // Enable CORS and JSON parsing
-app.use(cors());
+//app.use(cors());
 app.use(express.json());    
 
 // Configure multer for file uploads
