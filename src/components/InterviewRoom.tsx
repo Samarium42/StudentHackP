@@ -7,14 +7,22 @@ interface Recording {
     filename: string;
 }
 
+interface TTSState {
+    questions: string[];
+}
+
 const InterviewRoom: React.FC = () => {
     const [isRecording, setIsRecording] = useState(false);
     const [recordings, setRecordings] = useState<Recording[]>([]);
     const [ttsStatus, setTtsStatus] = useState<string>('');
     const [printStatus, setPrintStatus] = useState<string>('');
+    const [questionIndex, setQuestionIndex] = useState(0);
+    const [currentQuestion, setCurrentQuestion] = useState<string>('');
     const videoRef = useRef<HTMLVideoElement>(null);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [analysisResult, setAnalysisResult] = useState<any>(null);
 
     // Separate useEffect for video initialization
     useEffect(() => {
@@ -61,6 +69,23 @@ const InterviewRoom: React.FC = () => {
         } catch (error) {
             console.error('Error fetching recordings:', error);
         }
+    };
+
+    useEffect(() => {
+        fetch('tts_state.json')
+            .then(response => response.json())
+            .then((data: TTSState) => {
+                if (data.questions.length > 0) {
+                    setCurrentQuestion(data.questions[questionIndex]);
+                }
+            })
+            .catch(err => console.error('Failed to load questions:', err));
+    }, [questionIndex]);
+
+    // Existing useEffect and other logic...
+
+    const handleNextQuestion = () => {
+        setQuestionIndex(prev => prev + 1);
     };
 
     const startRecording = () => {
@@ -168,6 +193,37 @@ const InterviewRoom: React.FC = () => {
         }
     };
 
+    const analyzeResponse = async (audioBlob: Blob) => {
+        const formData = new FormData();
+        formData.append('audio', audioBlob);
+    
+        setIsAnalyzing(true);
+        try {
+            const response = await fetch('http://localhost:3001/analyze', {
+                method: 'POST',
+                body: formData,
+            });
+    
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+    
+            const analysisData = await response.json();
+            if (analysisData.success) {
+                // Handle the analysis data here
+                console.log(analysisData.results);
+                setAnalysisResult(analysisData.results);
+            } else {
+                throw new Error('Analysis failed');
+            }
+        } catch (error) {
+            console.error('Error during analysis:', error);
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
+    
+
     return (
         <div className="flex flex-col h-screen bg-gray-100">
             <header className="bg-white shadow">
@@ -195,8 +251,20 @@ const InterviewRoom: React.FC = () => {
                 <div className="w-1/2 p-4">
                     <div className="bg-white rounded-lg shadow-lg p-4 h-full flex flex-col">
                         <h2 className="text-xl font-semibold mb-4">Controls</h2>
-                        
-                        {/* Recording Controls */}
+
+
+                        <div className="mb-4">
+                            <button
+                                onClick={runTTS}
+                                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                            >
+                                Generate Question
+                            </button>
+                            {currentQuestion && (
+                            <p className="mt-2 text-lg text-gray-800">Question: {currentQuestion}</p>
+                        )}
+                        </div>
+
                         <div className="mb-4">
                             <button
                                 onClick={isRecording ? stopRecording : startRecording}
@@ -208,29 +276,6 @@ const InterviewRoom: React.FC = () => {
                             >
                                 {isRecording ? 'Stop Recording' : 'Start Recording'}
                             </button>
-                        </div>
-
-                        <div className="mb-4">
-                            <button
-                                onClick={runTTS}
-                                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-                            >
-                                Run TTS Script
-                            </button>
-                            {ttsStatus && (
-                                <p className="mt-2 text-sm text-gray-600">{ttsStatus}</p>
-                            )}
-                        </div>
-                        <div className="mb-4">
-                          <button
-                            onClick={printAString}
-                            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-                          >
-                            Print a String
-                          </button>
-                          {printStatus && (
-                              <p className="mt-2 text-sm text-gray-600">{printStatus}</p>
-                          )}
                         </div>
 
                         {/* Recordings List */}

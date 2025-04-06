@@ -141,6 +141,7 @@ def process_single_file(filename):
         transcript_file = f"questions/transcript_file_{counter}.txt"
         with open(transcript_file, "a") as f:
             f.write(transcript)
+            
     else:
         print(f"Failed to transcribe {filename}")
 

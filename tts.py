@@ -13,7 +13,7 @@ client = Neuphonic(api_key=NEUPHONIC_API_KEY)
 sse = client.tts.SSEClient()
 
 tts_config = TTSConfig(
-    speed=1.5,
+    speed= 0.85,
     lang_code='en',
     voice_id='e564ba7e-aa8d-46a2-96a8-8dffedade48f'
 )

@@ -5,19 +5,9 @@ const path = require('path');
 const fs = require('fs');
 const { spawn, exec } = require('child_process');
 require('dotenv').config();
-
+const router = express.Router();
 const app = express();
 const port = 3001;
-
-const scriptPath = path.join(__dirname, 'python_backend', 'check_and_generate.py');
-
-exec(`python3 ${scriptPath}`, (error, stdout, stderr) => {
-    if (error) {
-        console.error(`Error running check_and_generate.py: ${error}`);
-    }
-    console.log(`check_and_generate.py output: ${stdout}`);
-    console.log(`check_and_generate.py stderr: ${stderr}`);
-});
 
 // Enable CORS and JSON parsing
 //app.use(cors());
@@ -178,3 +168,27 @@ app.listen(port, () => {
     console.log(`Server running on port ${port}`);
     console.log(`API endpoints available at http://localhost:${port}/api/`);
 });
+
+router.post('/analyze', upload.single('audio'), (req, res) => {
+    const pythonProcess = spawn('python', ['python_backend/test_audio_analysis.py', req.file.path]);
+
+    let data = "";
+    pythonProcess.stdout.on('data', (chunk) => {
+        data += chunk.toString();
+    });
+
+    pythonProcess.on('close', (code) => {
+        if (code !== 0) {
+            return res.status(500).json({ success: false, message: "Failed to process the audio" });
+        }
+        
+        try {
+            const results = JSON.parse(data);
+            res.json({ success: true, results });
+        } catch (error) {
+            res.status(500).json({ success: false, message: "Failed to parse the output" });
+        }
+    });
+});
+
+module.exports = router;

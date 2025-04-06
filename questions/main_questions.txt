@@ -1,10 +1,10 @@
-Tell me more about a time you had to learn something completely new and apply it quickly, referencing your work with the LNJ Bhilwara Group or your physics studies.
+You mentioned achieving over 93% accuracy in sales predictions using XGBoost, SARIMAX, and Prophet at Polestar Solutions. Could you elaborate on the specific challenges you faced in optimizing these models and the strategies you employed to overcome them?
  
-Describe a situation where you had to work with a team to overcome a significant challenge, drawing on your experience at Hyperloop Manchester or PhysSoc.
+Based on your experience with algorithmic trading, what are some key differences in applying data science techniques to financial markets versus consumer behavior analysis, and how do you adapt your approach accordingly?
  
-Can you elaborate on your motivation for founding "Plastic and Pickers" and what you learned from that experience?
+Red Bull places a strong emphasis on innovation and understanding consumer trends. Can you describe a time you identified an emerging trend or opportunity using data analysis, and how you translated that insight into a actionable recommendation?
  
-Explain how you applied physics principles to your data analysis projects, giving a specific example from your Doppler Shifts Analysis or Atomic Box Simulation project.
+You highlighted your leadership in the Math Society, focusing on inclusivity. How would you apply your experience in fostering diversity and inclusion to contribute to a positive and collaborative work environment at Red Bull?
  
-Based on your coursework in Intro to Financial Math and Intro to Data Science, how do you see the intersection of these two fields and what excites you most about it?
+Your CV mentions participation in multiple hackathons. Can you describe a project where you had to learn a completely new technology or skill on the fly, and how you managed to quickly become proficient enough to contribute meaningfully to the team's success?
  
