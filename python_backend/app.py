@@ -59,7 +59,11 @@ def upload_cv():
     try:
         raw_text = extract_text_from_pdf_file(file)
         cleaned_text = clean_text(raw_text)
-        questions = generate_questions_from_text(cleaned_text)  # Only use CV text for questions
+        questions = generate_questions_from_text(cleaned_text)
+        with open('mainquestions.txt', 'w') as f:
+            for item in questions:
+                f.write(item + "\n")
+            
         #print("Questions: ", questions)
         return jsonify({'message': 'CV processed successfully','filename': file.filename,'questions': questions}), 200
     except Exception as e:
