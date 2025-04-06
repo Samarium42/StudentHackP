@@ -34,7 +34,7 @@ const CVUpload: React.FC<CVUploadProps> = ({ onUploadSuccess, jobDescription = '
     formData.append('job_description', jobDescription);
 
     try {
-      const response = await fetch('http://localhost:5000/upload-cv', {
+      const response = await fetch('http://localhost:5050/upload-cv', {
         method: 'POST',
         body: formData,
       });

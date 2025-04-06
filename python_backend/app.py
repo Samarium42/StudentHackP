@@ -6,7 +6,7 @@ from google import genai
 from google.genai import types
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=["http://localhost:3000"], supports_credentials=True)
 
 client = genai.Client(api_key="AIzaSyDl5FwX8vgtCyrXGgWTIHXchOLARwYeGB0")
 
@@ -61,9 +61,9 @@ def upload_cv():
         cleaned_text = clean_text(raw_text)
         questions = generate_questions_from_text(cleaned_text)  # Only use CV text for questions
         #print("Questions: ", questions)
-        return jsonify({'message': 'CV processed successfully'}), 200
+        return jsonify({'message': 'CV processed successfully','filename': file.filename,'questions': questions}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(port=5000, debug=True)
+    app.run(port=5050, debug=True)
