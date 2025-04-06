@@ -10,6 +10,8 @@ import sys
 # Your Google Cloud API key
 API_KEY = "AIzaSyCbv66adaLDsnUb8_1R_gKdAwqXPiQrWLA"
 
+counter = 0
+
 def split_audio(audio_path, chunk_duration=15):
     """
     Split audio file into chunks of specified duration (in seconds) using ffmpeg
@@ -117,6 +119,7 @@ def transcribe_audio(audio_path):
         return full_transcript.strip()
     except Exception as e:
         print(f"Error transcribing {audio_path}: {str(e)}")
+        counter = counter +1 
         return None
 
 def process_single_file(filename):
@@ -134,10 +137,9 @@ def process_single_file(filename):
     transcript = transcribe_audio(audio_file)
     
     if transcript:
-        transcript_file = audio_file.with_suffix(".txt")
+        transcript_file = f"questions/transcript_file_{counter}.txt"
         with open(transcript_file, "w") as f:
             f.write(transcript)
-        print(f"Saved transcript to {transcript_file.name}")
     else:
         print(f"Failed to transcribe {filename}")
 
