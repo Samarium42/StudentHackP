@@ -1,2 +1,2 @@
-Beyond successfully heating up your popcorn, what specific skills or insights regarding "Too Much AI" did you gain from replicating its functionality during the hackathon?
+Beyond the specific challenges encountered in the hackathon you mentioned, could you discuss any hurdles you faced while implementing XGBoost, SARIMAX, and Prophet at Polestar Solutions, and what approaches you took to address them in that professional setting?
  
