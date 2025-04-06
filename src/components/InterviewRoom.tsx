@@ -52,7 +52,7 @@ const InterviewRoom: React.FC = () => {
 
     const fetchRecordings = async () => {
         try {
-            const response = await fetch('http://localhost:3001/recordings');
+            const response = await fetch('http://localhost:3001/api/recordings');
             if (!response.ok) {
                 throw new Error('Failed to fetch recordings');
             }
@@ -82,7 +82,7 @@ const InterviewRoom: React.FC = () => {
                     formData.append('audio', audioBlob, filename);
 
                     try {
-                        const response = await fetch('http://localhost:3001/upload', {
+                        const response = await fetch('http://localhost:3001/api/upload', {
                             method: 'POST',
                             body: formData
                         });
