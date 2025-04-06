@@ -1,10 +1,10 @@
-Tell me about a time you had to learn a new technology quickly in a high-pressure situation, and how you approached it. What was the outcome?
+Tell me more about a time you had to learn something completely new and apply it quickly, referencing your work with the LNJ Bhilwara Group or your physics studies.
  
-Your CV mentions achieving over 93% accuracy in sales forecasting at Polestar Solutions. Can you elaborate on the challenges you faced during this project and how you overcame them?
+Describe a situation where you had to work with a team to overcome a significant challenge, drawing on your experience at Hyperloop Manchester or PhysSoc.
  
-Describe your experience designing and backtesting the trading algorithm you developed. What were the key performance indicators you focused on, and what did you learn from the backtesting results?
+Can you elaborate on your motivation for founding "Plastic and Pickers" and what you learned from that experience?
  
-Beyond the technical skills, how has your leadership role as Secretary General of the Math Society at the University of Manchester prepared you for a collaborative environment like the one at Squarepoint Capital?
+Explain how you applied physics principles to your data analysis projects, giving a specific example from your Doppler Shifts Analysis or Atomic Box Simulation project.
  
-Squarepoint Capital focuses on quantitative and systematic strategies. How do you think your experience with genetic algorithms and optimization, gained through projects like Genetic Orbits, aligns with the firm's approach to financial markets?
+Based on your coursework in Intro to Financial Math and Intro to Data Science, how do you see the intersection of these two fields and what excites you most about it?
  
