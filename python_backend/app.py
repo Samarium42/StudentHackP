@@ -60,7 +60,7 @@ def upload_cv():
         raw_text = extract_text_from_pdf_file(file)
         cleaned_text = clean_text(raw_text)
         questions = generate_questions_from_text(cleaned_text)
-        with open('mainquestions.txt', 'w') as f:
+        with open('../questions/main_questions.txt', 'w') as f:
             for item in questions:
                 f.write(item + "\n")
             
