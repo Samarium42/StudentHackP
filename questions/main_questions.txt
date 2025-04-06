@@ -1,0 +1,10 @@
+You mentioned achieving over 93% accuracy in sales predictions using XGBoost, SARIMAX, and Prophet at Polestar Solutions. Could you elaborate on the specific challenges you faced in optimizing these models and the strategies you employed to overcome them?
+ 
+Based on your experience with algorithmic trading, what are some key differences in applying data science techniques to financial markets versus consumer behavior analysis, and how do you adapt your approach accordingly?
+ 
+Red Bull places a strong emphasis on innovation and understanding consumer trends. Can you describe a time you identified an emerging trend or opportunity using data analysis, and how you translated that insight into a actionable recommendation?
+ 
+You highlighted your leadership in the Math Society, focusing on inclusivity. How would you apply your experience in fostering diversity and inclusion to contribute to a positive and collaborative work environment at Red Bull?
+ 
+Your CV mentions participation in multiple hackathons. Can you describe a project where you had to learn a completely new technology or skill on the fly, and how you managed to quickly become proficient enough to contribute meaningfully to the team's success?
+ 
