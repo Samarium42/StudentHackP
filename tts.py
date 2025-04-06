@@ -36,12 +36,14 @@ def update_index(index):
 def speak_next_question():
     questions = load_questions()
     index = get_current_index()
+    check_and_generate()
 
     if index >= len(questions):
         print("All questions have been spoken.")
         return "DONE"
 
     if (index%2 == 1):
+        
         with open(os.path.abspath('questions/follow_up_questions.txt'), 'r') as f:
             questions = f.readlines()
             question = questions[index-1]
@@ -52,10 +54,10 @@ def speak_next_question():
 
     else:
     
-        question = questions[index-1]
-        print(f"Speaking question {index + 1}: {question}")
+        question = questions[index]
+        print(f"Speaking question {index}: {question}")
 
-        check_and_generate()
+        
 
         with AudioPlayer() as player:
             response = sse.send(question, tts_config=tts_config)

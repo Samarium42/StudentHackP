@@ -1,1 +1,2 @@
-Could you provide a specific example of a time you sought guidance from a more knowledgeable colleague to improve a forecasting model's performance, and what specific steps did you take based on their advice?
+Beyond successfully heating up your popcorn, what specific skills or insights regarding "Too Much AI" did you gain from replicating its functionality during the hackathon?
+ 

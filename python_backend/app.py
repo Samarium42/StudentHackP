@@ -5,6 +5,7 @@ import re
 from google import genai
 from google.genai import types
 import os
+import time
 app = Flask(__name__)
 CORS(app, origins=["http://localhost:3000"], supports_credentials=True)
 
@@ -45,6 +46,7 @@ def extract_questions_from_response(response):
         return []
 
 def generate_follow_up_question():
+    time.sleep(4)
     print("HELLOOO?!?!?!?!?")
     with open(os.path.abspath('questions/follow_up_questions.txt'), 'w') as f:
         f.close()
@@ -54,7 +56,7 @@ def generate_follow_up_question():
     with open(os.path.abspath('questions/main_questions.txt'), 'r') as g:
         main_questions = g.readlines()
         asked = main_questions[num]
-    with open(os.path.abspath(f"questions/transcript_file_{num + 1}.txt"), 'r') as h:
+    with open(os.path.abspath(f"questions/transcript_file_{num+1}.txt"), 'r') as h:
         transcript = h.readlines()
         response = transcript[0]
 
@@ -66,6 +68,7 @@ def generate_follow_up_question():
     question = extract_questions_from_response(response)
     with open(os.path.abspath('questions/follow_up_questions.txt'), 'a') as i:
         i.write(question[0] + "\n")
+        i.write(" " + "\n")
         
     f.close()
     g.close()
@@ -93,6 +96,7 @@ def upload_cv():
         with open('../questions/main_questions.txt', 'w') as f:
             for item in questions:
                 f.write(item + "\n")
+                f.write(" " + "\n")
             
         #print("Questions: ", questions)
         return jsonify({'message': 'CV processed successfully','filename': file.filename,'questions': questions}), 200

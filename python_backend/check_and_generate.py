@@ -1,6 +1,6 @@
 import json
-#from python_backend.app import generate_follow_up_question
 import time
+from python_backend.app import *
 
 
 def check_and_generate():

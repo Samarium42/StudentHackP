@@ -1,5 +1,10 @@
-Your CV mentions using XGBoost, SARIMAX, and Prophet for sales forecasting at Polestar Solutions. Can you elaborate on your experience with these models, specifically focusing on the challenges you faced and how you overcame them?
-You highlight your experience with algorithmic trading strategies. Could you explain in layman's terms the short straddle and strangle strategies you implemented and what insights you gained from backtesting them?
-Red Bull is known for its fast-paced and innovative environment. Describe a time you had to quickly learn a new skill or technology to solve a problem, and how you approached that situation?
-As Secretary General of the Math Society, you focused on making events accessible and inclusive. Can you share an example of a specific challenge you faced in promoting diversity and inclusion and what steps you took to address it?
-Your CV mentions participating in several hackathons. Tell me about the Genetic Orbits project. What did you learn about orbital dynamics during this project?
+Tell me about a time you had to learn a new technology quickly in a high-pressure situation, and how you approached it. What was the outcome?
+ 
+Your CV mentions achieving over 93% accuracy in sales forecasting at Polestar Solutions. Can you elaborate on the challenges you faced during this project and how you overcame them?
+ 
+Describe your experience designing and backtesting the trading algorithm you developed. What were the key performance indicators you focused on, and what did you learn from the backtesting results?
+ 
+Beyond the technical skills, how has your leadership role as Secretary General of the Math Society at the University of Manchester prepared you for a collaborative environment like the one at Squarepoint Capital?
+ 
+Squarepoint Capital focuses on quantitative and systematic strategies. How do you think your experience with genetic algorithms and optimization, gained through projects like Genetic Orbits, aligns with the firm's approach to financial markets?
+ 
