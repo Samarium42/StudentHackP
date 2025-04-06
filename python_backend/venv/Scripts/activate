@@ -18,6 +18,7 @@ deactivate () {
     # past commands the $PATH changes we made may not be respected
     hash -r 2> /dev/null
 
+
     if [ -n "${_OLD_VIRTUAL_PS1:-}" ] ; then
         PS1="${_OLD_VIRTUAL_PS1:-}"
         export PS1
