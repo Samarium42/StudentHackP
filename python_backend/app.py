@@ -44,6 +44,33 @@ def extract_questions_from_response(response):
         print(f"Error parsing response: {e}")
         return []
 
+def generate_follow_up_question():
+    with open('../questions/follow_up_questions.txt', 'r') as f:
+        follow_up_questions = f.readlines()
+        num = len(follow_up_questions)
+    with open('../questions/main_questions.txt', 'r') as g:
+        main_questions = g.readlines()
+        asked = main_questions[num]
+    with open(f"../questions/transcript_file_{num}.txt", 'r') as h:
+        transcript = h.readlines()
+        response = transcript[0]
+
+    prompt = f"Generate 1 follow up question based on the following response to :\n{asked}. \nThe interviewee's response was:\n{response}\nPut square brackets the question and do not include numbers anywhere in your response."
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=prompt
+    )
+    question = extract_questions_from_response(response)
+    with open(f"../questions/follow_up_questions.txt", 'a') as i:
+        i.write(question[0] + "\n")
+        
+    f.close()
+    g.close()
+    h.close()
+    i.close()
+
+    return
+
 @app.route('/upload-cv', methods=['POST'])
 def upload_cv():
     print("Upload CV called")
