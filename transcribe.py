@@ -6,11 +6,9 @@ import base64
 import subprocess
 import tempfile
 import sys
-
+import json
 # Your Google Cloud API key
 API_KEY = "AIzaSyCbv66adaLDsnUb8_1R_gKdAwqXPiQrWLA"
-
-counter = 0
 
 def split_audio(audio_path, chunk_duration=15):
     """
@@ -119,13 +117,16 @@ def transcribe_audio(audio_path):
         return full_transcript.strip()
     except Exception as e:
         print(f"Error transcribing {audio_path}: {str(e)}")
-        counter = counter +1 
         return None
 
 def process_single_file(filename):
     """
     Process a single audio file and save its transcript
     """
+
+    with open("questions/tts_state.json", "r") as f:
+        state = json.load(f)
+        counter = state.get('index', 0)
     recordings_dir = Path(__file__).parent / "recordings"
     audio_file = recordings_dir / filename
     
@@ -138,7 +139,7 @@ def process_single_file(filename):
     
     if transcript:
         transcript_file = f"questions/transcript_file_{counter}.txt"
-        with open(transcript_file, "w") as f:
+        with open(transcript_file, "a") as f:
             f.write(transcript)
     else:
         print(f"Failed to transcribe {filename}")

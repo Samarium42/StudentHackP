@@ -4,7 +4,7 @@ import fitz  # PyMuPDF
 import re
 from google import genai
 from google.genai import types
-
+import os
 app = Flask(__name__)
 CORS(app, origins=["http://localhost:3000"], supports_credentials=True)
 
@@ -45,13 +45,16 @@ def extract_questions_from_response(response):
         return []
 
 def generate_follow_up_question():
-    with open('../questions/follow_up_questions.txt', 'r') as f:
+    print("HELLOOO?!?!?!?!?")
+    with open(os.path.abspath('questions/follow_up_questions.txt'), 'w') as f:
+        f.close()
+    with open(os.path.abspath('questions/follow_up_questions.txt'), 'r') as f:
         follow_up_questions = f.readlines()
         num = len(follow_up_questions)
-    with open('../questions/main_questions.txt', 'r') as g:
+    with open(os.path.abspath('questions/main_questions.txt'), 'r') as g:
         main_questions = g.readlines()
         asked = main_questions[num]
-    with open(f"../questions/transcript_file_{num}.txt", 'r') as h:
+    with open(os.path.abspath(f"questions/transcript_file_{num + 1}.txt"), 'r') as h:
         transcript = h.readlines()
         response = transcript[0]
 
@@ -61,7 +64,7 @@ def generate_follow_up_question():
         contents=prompt
     )
     question = extract_questions_from_response(response)
-    with open(f"../questions/follow_up_questions.txt", 'a') as i:
+    with open(os.path.abspath('questions/follow_up_questions.txt'), 'a') as i:
         i.write(question[0] + "\n")
         
     f.close()

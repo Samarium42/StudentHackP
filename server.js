@@ -9,6 +9,16 @@ require('dotenv').config();
 const app = express();
 const port = 3001;
 
+const scriptPath = path.join(__dirname, 'python_backend', 'check_and_generate.py');
+
+exec(`python3 ${scriptPath}`, (error, stdout, stderr) => {
+    if (error) {
+        console.error(`Error running check_and_generate.py: ${error}`);
+    }
+    console.log(`check_and_generate.py output: ${stdout}`);
+    console.log(`check_and_generate.py stderr: ${stderr}`);
+});
+
 // Enable CORS and JSON parsing
 //app.use(cors());
 app.use(express.json());    

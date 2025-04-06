@@ -2,6 +2,7 @@ from pyneuphonic import Neuphonic, TTSConfig
 from pyneuphonic.player import AudioPlayer
 import os
 import json
+from python_backend.check_and_generate import check_and_generate
 
 NEUPHONIC_API_KEY = "88bd64f79fa25367199f020688d1223a56b91baf483d069f7d26967754e612a9.2b6121df-5054-4e30-86f9-a3e6d3896b87"  # Use environment variable in production
 QUESTIONS_FILE = "questions/main_questions.txt"
@@ -12,7 +13,7 @@ client = Neuphonic(api_key=NEUPHONIC_API_KEY)
 sse = client.tts.SSEClient()
 
 tts_config = TTSConfig(
-    speed=0.85,
+    speed=1.5,
     lang_code='en',
     voice_id='e564ba7e-aa8d-46a2-96a8-8dffedade48f'
 )
@@ -40,13 +41,26 @@ def speak_next_question():
         print("All questions have been spoken.")
         return "DONE"
 
-    question = questions[index]
-    print(f"Speaking question {index + 1}: {question}")
+    if (index%2 == 1):
+        with open(os.path.abspath('questions/follow_up_questions.txt'), 'r') as f:
+            questions = f.readlines()
+            question = questions[index-1]
 
-    with AudioPlayer() as player:
-        response = sse.send(question, tts_config=tts_config)
-        player.play(response)
-        player.save_audio(f"output_question_{index + 1}.wav")
+            with AudioPlayer() as player:
+                response = sse.send(question, tts_config=tts_config)
+                player.play(response)
+
+    else:
+    
+        question = questions[index-1]
+        print(f"Speaking question {index + 1}: {question}")
+
+        check_and_generate()
+
+        with AudioPlayer() as player:
+            response = sse.send(question, tts_config=tts_config)
+            player.play(response)
+
 
     update_index(index + 1)
     return question
