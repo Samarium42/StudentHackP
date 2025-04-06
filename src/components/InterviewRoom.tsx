@@ -277,24 +277,6 @@ const InterviewRoom: React.FC = () => {
                                 {isRecording ? 'Stop Recording' : 'Start Recording'}
                             </button>
                         </div>
-
-                        {/* Recordings List */}
-                        <div className="flex-1 overflow-y-auto">
-                            <h3 className="text-lg font-semibold mb-2">Recordings</h3>
-                            <div className="space-y-2">
-                                {recordings.map((recording, index) => (
-                                    <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                                        <span>Recording {index + 1}</span>
-                                        <button
-                                            onClick={() => downloadRecording(recording)}
-                                            className="text-blue-500 hover:text-blue-600"
-                                        >
-                                            Download
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>

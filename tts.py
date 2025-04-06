@@ -41,6 +41,10 @@ def speak_next_question():
     if index >= len(questions):
         print("All questions have been spoken.")
         return "DONE"
+    if index == 0 :
+        with AudioPlayer() as player:
+            response = sse.send("Hello, I am the interviewer. Let's start the interview.", tts_config=tts_config)
+            player.play(response)
 
     if (index%2 == 1):
         
